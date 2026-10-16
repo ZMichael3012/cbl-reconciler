@@ -1,3 +1,3 @@
-// Пакет transport содержит транспортный слой сервиса reconciler:
-// HTTP-хендлеры Gin и gRPC-обработчики, собранные из usecase.
+// Package transport contains the transport layer of the reconciler service:
+// Gin HTTP handlers and gRPC handlers composed from usecase.
 package transport

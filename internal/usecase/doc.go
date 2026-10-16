@@ -1,3 +1,3 @@
-// Пакет usecase содержит сценарии использования сервиса reconciler:
-// оркестрацию доменных правил, транзакций и публикации событий.
+// Package usecase contains the use cases of the reconciler service:
+// orchestration of domain rules, transactions and event publishing.
 package usecase
