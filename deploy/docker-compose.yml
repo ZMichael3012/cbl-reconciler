@@ -62,13 +62,19 @@ services:
   reconciler:
     profiles: ["app"]
     build:
-      context: ..
+      context: ../..
+      dockerfile: cbl-reconciler/Dockerfile
     environment:
       HTTP_ADDR: ":8100"
       GRPC_ADDR: ":9100"
       METRICS_ADDR: ":9300"
       PG_DSN: postgres://cbl:cbl@postgres:5432/recon?sslmode=disable
       KAFKA_BROKERS: kafka:29092
+      RECON_CONNECTOR_ADDR: connector:9050
+      RECON_PAYMENT_ADDR: payment:9030
+      RECON_LEDGER_ADDR: ledger:9040
+      RECON_PROVIDERS: coingate
+      RECON_EXPORT_INTERVAL: 5m
     ports:
       - "8100:8100"
       - "9100:9100"
