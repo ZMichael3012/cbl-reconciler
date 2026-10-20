@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cbl/cbl-kit/grpcmw"
+	"github.com/ZMichael3012/cbl-kit/grpcmw"
 
 	"github.com/cbl/cbl-reconciler/internal/domain"
 	"github.com/cbl/cbl-reconciler/internal/usecase"

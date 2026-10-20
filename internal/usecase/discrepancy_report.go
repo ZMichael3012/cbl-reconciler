@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/cbl/cbl-kit/grpcmw"
+	"github.com/ZMichael3012/cbl-kit/grpcmw"
 
 	"github.com/cbl/cbl-reconciler/internal/domain"
 )

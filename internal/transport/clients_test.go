@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	commonv1 "github.com/cbl/cbl-protos/gen/go/billing/common/v1"
-	connectorv1 "github.com/cbl/cbl-protos/gen/go/billing/connector/v1"
-	paymentv1 "github.com/cbl/cbl-protos/gen/go/billing/payment/v1"
+	commonv1 "github.com/ZMichael3012/cbl-protos/gen/go/billing/common/v1"
+	connectorv1 "github.com/ZMichael3012/cbl-protos/gen/go/billing/connector/v1"
+	paymentv1 "github.com/ZMichael3012/cbl-protos/gen/go/billing/payment/v1"
 
 	"github.com/cbl/cbl-reconciler/internal/domain"
 	"github.com/cbl/cbl-reconciler/internal/transport"

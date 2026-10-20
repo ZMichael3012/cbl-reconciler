@@ -23,8 +23,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	"github.com/cbl/cbl-kit/outbox"
-	"github.com/cbl/cbl-kit/storagex"
+	"github.com/ZMichael3012/cbl-kit/outbox"
+	"github.com/ZMichael3012/cbl-kit/storagex"
 
 	"github.com/cbl/cbl-reconciler/internal/domain"
 	"github.com/cbl/cbl-reconciler/internal/storage"

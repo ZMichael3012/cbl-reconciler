@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/cbl/cbl-kit/outbox"
+	"github.com/ZMichael3012/cbl-kit/outbox"
 
 	"github.com/cbl/cbl-reconciler/internal/domain"
 )
