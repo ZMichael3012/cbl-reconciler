@@ -1,0 +1,20 @@
+apiVersion: 1
+# Read-only provisioning of the reconciler PostgreSQL datasource (CBL-9.4).
+# Use a dedicated SELECT-only PostgreSQL role (recon_report) limited to
+# recon_alert_keys/recon_runs; the values come from the platform environment
+# (0.6/0.7), no credentials are stored in the repository.
+datasources:
+  - name: recon-postgres
+    uid: recon-postgres
+    type: postgres
+    access: proxy
+    url: ${RECON_POSTGRES_URL}
+    user: ${RECON_POSTGRES_USER}
+    isDefault: false
+    editable: false
+    jsonData:
+      database: recon
+      sslmode: ${RECON_POSTGRES_SSLMODE}
+      readOnly: true
+    secureJsonData:
+      password: ${RECON_POSTGRES_PASSWORD}

@@ -135,6 +135,8 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	reportService := usecase.NewDiscrepancyReportService(storage.NewReportStore(db))
+	router.GET("/reports/discrepancies", transport.NewReportHandler(reportService))
 
 	httpSrv := &http.Server{Addr: httpAddr, Handler: router, ReadHeaderTimeout: 5 * time.Second}
 	metricsSrv := &http.Server{Addr: metricsAddr, Handler: metricsHandler(), ReadHeaderTimeout: 5 * time.Second}

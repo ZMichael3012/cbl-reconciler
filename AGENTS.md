@@ -16,7 +16,7 @@ Out of scope: other platform services; interaction only through the `cbl-protos`
 
 ## 2. Contracts
 
-- REST: administrative /healthz, /readyz
+- REST: administrative /healthz, /readyz and the internal `GET /reports/discrepancies` aggregate report (CBL-9.4; problem+json 400/503; not published externally)
 - gRPC: client: ConnectorService (`ListGatewayPayments`, the 17.13 export),
   PaymentService (`GetPayment`), LedgerService (`ListEntries`)
 - Kafka produces: recon.alerts (through the outbox; `event_type = recon.alert`,
@@ -25,7 +25,7 @@ Out of scope: other platform services; interaction only through the `cbl-protos`
   gateway.payout.events (provider payout verdicts) through the kit inbox
 - Storage: PostgreSQL recon (`outbox`, `inbox`, `recon_runs`,
   `recon_canonical_seen`, `recon_replays`, `recon_payout_observations`,
-  `recon_alert_keys`)
+  `recon_alert_keys` with the alert metadata for the report, migration 00004)
 
 Contracts are frozen in `cbl-protos` (CF-1 for gRPC, CF-2/CF-3/CF-4 for events), see `CBL-004`.
 
@@ -80,6 +80,17 @@ the unmapped case is an empty canonical status with the raw word
 (connector KI-connector-13). The pass never uses provider raw words for state
 machines.
 
+Discrepancy report and dashboard (9.4): the alert metadata (type, ref, merchant,
+severity, evidence) is stored with the dedup key on the first insert (migration
+00004); `GET /reports/discrepancies` aggregates the window (last_seen_at in
+[from, to), default 24h, max 90 days) and returns the totals, the
+type/severity/merchant aggregates, the newest limit items and the pass freshness;
+a repeated detection only moves last_seen_at and occurrences. The Grafana
+dashboard artifact (`deploy/grafana/dashboards/cbl-reconciler.json`, datasource
+`recon-postgres`, read-only) renders the same state; its runtime is the platform
+observability (0.7). The report never uses provider raw words and never moves
+money. The route is internal (no auth) and must not be published externally.
+
 ## 4. Commands
 
 ```powershell
@@ -111,7 +122,10 @@ default 24h), `RECON_PAGE_LIMIT` (default 100, bound 500),
 `RECON_EXPORT_MAX_PAGES` (page walk cap of one provider pass, default 100),
 `RECON_REPAIR_GRACE` (how long a suppressed repair may stay unapplied before
 the pass escalates, default 15m), `RECON_LEDGER_PAGE_LIMIT` (default 200),
-`RECON_LEDGER_MAX_PAGES` (default 10).
+`RECON_LEDGER_MAX_PAGES` (default 10). The dashboard datasource provisioning uses
+`RECON_POSTGRES_URL` (host:port), `RECON_POSTGRES_USER` (a SELECT-only role
+limited to recount tables), `RECON_POSTGRES_PASSWORD`, `RECON_POSTGRES_SSLMODE`;
+these are consumed by Grafana (0.7), not by the service.
 
 ## 6. Development rules
 
@@ -140,6 +154,10 @@ consumer lag; dashboards after task 0.7. The pass logs one line per provider
 | T-RECON-02 | Classification uses the canonical progression table (`PaymentSatisfies`) instead of numeric ranks; providers ahead of a non-terminal payment are repaired by replay, terminal conflicts alert | one readable table drives replay and alerting; the payment consumer stays the only state machine | the table must follow the payment state machine (4.x); unknown/unmapped provider words alert as warnings instead of repairing |
 | T-RECON-03 | Alerts are deduplicated by `(type, ref_id, expected, actual)` with occurrences/last_seen counters; no resolution lifecycle yet | repeated passes cannot storm Kafka or ClickHouse; an operator sees first/last seen and the count | an alert never "resolves" automatically and the dedup tables have no retention (KI-reconciler-02); resolution and the back-office view are 9.4/12.3 |
 | T-RECON-04 | The event consumers only record observations (canonical -> replay suppression, payouts -> verdict store); no money movement and no payout client yet | the payment contour is independent of the payout one; the payout increment gets the provider verdicts already stored | payout/refund/fee reconciliation (plan 3.9) is not covered by this increment; it needs a payout read client and a settlement hypothesis (the next 17.13 increment) |
+| T-RECON-05 | The discrepancy report aggregates the reconciler PostgreSQL, not ClickHouse | the reconciler owns the alert lifecycle facts; no ClickHouse client; T-09 keeps ClickHouse reporting-only | the aggregate is per database (the service uses one shared DB); the ClickHouse facts stay reporting's contour |
+| T-RECON-06 | The alert metadata is stored on the first dedup insert and is immutable | the report and dashboard need no key parsing; severity/merchant survive | migration 00004 and the `RaiseAlert` signature change; legacy rows have empty metadata |
+| T-RECON-08 | The Grafana dashboard artifact is owned by the platform observability (0.7): the service ships the JSON and the datasource provisioning, the artifact is validated and its SQL is executed by the e2e | the service does not run Grafana; the platform mounts the artifact read-only | a runtime divergence is caught only by the artifact test and the SQL execution until 0.7 |
+| T-RECON-07 | The admin report has no authN/authZ; the HTTP port 8100 is not published outside the compose network (the service compose and the global compose publish only the gRPC/metrics ports) | it is an internal contour like /healthz; the perimeter and mTLS are 0.6; the report exposes cross-tenant alert metadata (merchant id, evidence) inside the trusted network only | a compromised service in the network can read cross-tenant alert metadata; the route returns `Cache-Control: no-store`; loopback/role-based exposure is KI-reconciler-05 |
 
 ## 9. Known issues
 
@@ -148,6 +166,7 @@ consumer lag; dashboards after task 0.7. The pass logs one line per provider
 | KI-reconciler-01 | CI and pre-commit are not configured | linters run manually | task 0.2 | open |
 | KI-reconciler-02 | `recon_alert_keys`, `recon_canonical_seen`, `recon_replays` and `recon_payout_observations` have no retention or archive | tables grow with time and traffic | retention/archive decision with 14.2 | open |
 | KI-reconciler-03 | Duplicate-txid detection is per-pass (the txid map is rebuilt on every run), so one txid across two payments reported in different windows is not detected | a slow double-credit pattern across windows stays hidden | a persistent txid index or the provider poller (17.23) | open |
+| KI-reconciler-05 | The discrepancy report route has no authN/authZ: it exposes cross-tenant alert metadata (merchant id, evidence) to any caller inside the trusted network; port 8100 is not published by the composes | an internal caller reads cross-tenant counts and evidence; no external exposure, no merchant payloads beyond the alert evidence | 0.6 adds mTLS/authZ on the internal surfaces or the report moves under the back-office `/admin/v1` with `reconciliation:read`; until then do not publish 8100 | open |
 | KI-reconciler-04 | The ledger evidence check is bounded (`RECON_LEDGER_MAX_PAGES`, 10 x 200 entries from the payment creation time); a payment with an extreme number of older entries can be reported as missing | a false missing_in_ledger alert for pathological entry volumes | provider evidence and entry volumes are re-checked in 17.18; a ref-indexed ledger read is a candidate follow-up | open |
 
 ## 10. Task journal
@@ -156,8 +175,28 @@ consumer lag; dashboards after task 0.7. The pass logs one line per provider
 | :-- | :-- | :-- | :-- | :-- |
 | CBL-16.13 | 2026-10-16 | done (English comments and documentation; e2e run instruction `test/e2e/E2E.md` added as a plan, scenarios arrive with CBL-9.x; no code changes) | `.specs/CBL-16.13-conventions.md` | this commit |
 | CBL-17.13 (increment 2, reconciler) | 2026-10-18 | done, review closed (payment contour: the periodic per-provider export pass with adjacent persisted windows and crash-safe cursor resume, the progression-table classification with the canonical boundary before every replay (provider binding, amount evidence, field bounds, confirmations) and the recovery escalation, lost-webhook replay of `gateway.events.canonical`, deduplicated `recon.alerts` via the outbox, the canonical/payout observation consumers, gRPC clients of Connector/Payment/Ledger; migrations 00001-00003; unit R-01..R-26, storage I-01..I-05, the testcontainers e2e `E2E_Reconciler_PaymentRecon` green; red-first recorded; 4 reviewers, 5 blocking findings closed; unit+integration coverage 89.0%; lint 0; Dockerfile/compose switched to the services-context build) | `.specs/CBL-17.13-reconciler.md` | this commit |
+| CBL-9.4 | 2026-10-20 | done, review closed (discrepancy report and dashboard: the alert metadata stored with the dedup key on the first insert (migration 00004, `RaiseAlert` takes the alert), the internal `GET /reports/discrepancies` with the 24h default window, the 90-day bound, the totals/type/severity/merchant aggregates, the newest item page and the pass freshness; the read-only Grafana dashboard artifact and the `recon-postgres` datasource provisioning; the `test/dashboards` artifact validation and the e2e `E2E_Reconciler_Report` executing every target SQL; unit+integration coverage 88.9%; lint 0; 4 review passes closed) | `.specs/CBL-9.4-discrepancy-report.md` | this commit |
 
 ## 11. Runbook
+
+Discrepancy report (9.4):
+
+1. `GET http://localhost:8100/reports/discrepancies?from=&to=&limit=` returns the
+   aggregates and the items; 400 `validation_failed` for a bad timestamp, an
+   inverted or over-90-days window or a bad limit; 503 `service_unavailable` with
+   `Retry-After: 1` when PostgreSQL is down. The route has no auth and must not be
+   published outside the internal network.
+2. Empty items: the default window is the last 24h (`last_seen_at`); widen
+   `from`/`to` (max 90 days). Legacy rows inserted before migration 00004 carry
+   empty `alert_type`/`severity`/`merchant_id` (the stand is reset per run).
+3. The dashboard (`deploy/grafana/dashboards/cbl-reconciler.json`) uses the
+   `recon-postgres` datasource from
+   `deploy/grafana/provisioning/datasources/recon-postgres.yml`; the runtime is
+   the platform Grafana (0.7). The e2e executes every target SQL against the
+   service schema, so a schema change requires a dashboard update in the same
+   commit.
+4. The report only reads; it never repairs or resolves an alert. Resolution lives
+   in the back-office (12.3).
 
 Reconciliation pass (17.13):
 

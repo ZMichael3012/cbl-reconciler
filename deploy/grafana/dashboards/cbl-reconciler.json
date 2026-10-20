@@ -1,0 +1,108 @@
+{
+  "uid": "cbl-reconciler",
+  "title": "CBL Reconciler",
+  "description": "Reconciliation pass freshness and deduplicated discrepancy alerts (CBL-9.4).",
+  "tags": ["cbl", "reconciler"],
+  "editable": false,
+  "graphTooltip": 0,
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "utc",
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Recon pass freshness",
+      "description": "The in-flight window and the age of the last pass per provider.",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT provider, window_from, window_until, updated_at, EXTRACT(EPOCH FROM (now() - updated_at)) AS age_seconds FROM recon_runs ORDER BY provider"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Alerts and occurrences (window)",
+      "description": "Distinct alert classes and the sum of detection counters.",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT count(*) AS alerts, coalesce(sum(occurrences), 0) AS occurrences FROM recon_alert_keys WHERE $__timeFilter(last_seen_at)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Alerts by type (window)",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT alert_type AS type, count(*) AS alerts, coalesce(sum(occurrences), 0) AS occurrences FROM recon_alert_keys WHERE $__timeFilter(last_seen_at) GROUP BY alert_type ORDER BY occurrences DESC, alert_type"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Alerts by severity (window)",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT severity, count(*) AS alerts, coalesce(sum(occurrences), 0) AS occurrences FROM recon_alert_keys WHERE $__timeFilter(last_seen_at) GROUP BY severity ORDER BY occurrences DESC, severity"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Top merchants (window)",
+      "description": "System alerts have no merchant and are excluded.",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT merchant_id, count(*) AS alerts, coalesce(sum(occurrences), 0) AS occurrences FROM recon_alert_keys WHERE $__timeFilter(last_seen_at) AND merchant_id <> '' GROUP BY merchant_id ORDER BY occurrences DESC, merchant_id LIMIT 10"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Recent alerts (window)",
+      "datasource": { "type": "postgres", "uid": "recon-postgres" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "refId": "A",
+          "rawQuery": true,
+          "datasource": { "type": "postgres", "uid": "recon-postgres" },
+          "rawSql": "SELECT alert_id, alert_type, ref_id, merchant_id, severity, expected, actual, first_seen_at, last_seen_at, occurrences FROM recon_alert_keys WHERE $__timeFilter(last_seen_at) ORDER BY last_seen_at DESC, alert_id LIMIT 20"
+        }
+      ]
+    }
+  ]
+}

@@ -76,7 +76,6 @@ services:
       RECON_PROVIDERS: coingate
       RECON_EXPORT_INTERVAL: 5m
     ports:
-      - "8100:8100"
       - "9100:9100"
       - "9300:9300"
     depends_on:

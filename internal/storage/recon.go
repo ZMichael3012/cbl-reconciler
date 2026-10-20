@@ -191,12 +191,15 @@ func NewAlertStore(db *gorm.DB) *AlertStore {
 
 // RaiseAlert stores the dedup key and appends the envelope in one transaction;
 // false means the detection class was already published.
-func (r *AlertStore) RaiseAlert(ctx context.Context, dedupKey string, env outbox.Envelope) (bool, error) {
+func (r *AlertStore) RaiseAlert(ctx context.Context, alert domain.Alert, env outbox.Envelope) (bool, error) {
+	dedupKey := alert.DedupKey()
 	inserted := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		now := time.Now().UTC()
 		row := AlertKeyRow{
 			DedupKey: dedupKey, AlertID: env.EventID,
+			AlertType: string(alert.Type), RefID: alert.RefID, MerchantID: alert.MerchantID,
+			Severity: string(alert.Severity), Expected: alert.Expected, Actual: alert.Actual,
 			FirstSeenAt: now, LastSeenAt: now, Occurrences: 1,
 		}
 		result := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "dedup_key"}}, DoNothing: true}).Create(&row)
@@ -213,6 +216,23 @@ func (r *AlertStore) RaiseAlert(ctx context.Context, dedupKey string, env outbox
 				}).Error
 			if err != nil {
 				return fmt.Errorf("storage: bump alert key: %w", err)
+			}
+			// Rows created before migration 00004 carry empty metadata; a later
+			// detection of the same class fills it without touching the identity
+			// fields or the counters (the report/dashboard upgrade path).
+			err = tx.Exec(`
+				UPDATE recon_alert_keys SET
+					alert_type  = CASE WHEN alert_type  = '' THEN ? ELSE alert_type  END,
+					ref_id      = CASE WHEN ref_id      = '' THEN ? ELSE ref_id      END,
+					merchant_id = CASE WHEN merchant_id = '' THEN ? ELSE merchant_id END,
+					severity    = CASE WHEN severity    = '' THEN ? ELSE severity    END,
+					expected    = CASE WHEN expected    = '' THEN ? ELSE expected    END,
+					actual      = CASE WHEN actual      = '' THEN ? ELSE actual      END
+				WHERE dedup_key = ?`,
+				string(alert.Type), alert.RefID, alert.MerchantID, string(alert.Severity),
+				alert.Expected, alert.Actual, dedupKey).Error
+			if err != nil {
+				return fmt.Errorf("storage: fill alert metadata: %w", err)
 			}
 			return nil
 		}

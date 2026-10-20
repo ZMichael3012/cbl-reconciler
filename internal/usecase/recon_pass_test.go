@@ -108,7 +108,8 @@ type fakeAlerts struct {
 	err    error
 }
 
-func (f *fakeAlerts) RaiseAlert(_ context.Context, dedupKey string, env outbox.Envelope) (bool, error) {
+func (f *fakeAlerts) RaiseAlert(_ context.Context, alert domain.Alert, env outbox.Envelope) (bool, error) {
+	dedupKey := alert.DedupKey()
 	if f.err != nil {
 		return false, f.err
 	}

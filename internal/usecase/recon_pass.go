@@ -59,9 +59,9 @@ type LedgerReader interface {
 
 // AlertPublisher publishes a deduplicated alert envelope.
 type AlertPublisher interface {
-	// RaiseAlert stores the dedup key and appends the envelope atomically;
-	// false means the detection class was already published.
-	RaiseAlert(ctx context.Context, dedupKey string, env outbox.Envelope) (bool, error)
+	// RaiseAlert stores the alert metadata and dedup key and appends the
+	// envelope atomically; false means the detection class was already published.
+	RaiseAlert(ctx context.Context, alert domain.Alert, env outbox.Envelope) (bool, error)
 }
 
 // ReplayPublisher publishes a canonical replay envelope.
@@ -619,7 +619,7 @@ func (p *ReconPass) raise(ctx context.Context, alert domain.Alert, result *Provi
 	if err != nil {
 		return fmt.Errorf("alert envelope %s: %w", alert.RefID, err)
 	}
-	inserted, err := p.alerts.RaiseAlert(ctx, alert.DedupKey(), env)
+	inserted, err := p.alerts.RaiseAlert(ctx, alert, env)
 	if err != nil {
 		return fmt.Errorf("alert publish %s: %w", alert.RefID, err)
 	}

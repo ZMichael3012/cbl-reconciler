@@ -86,15 +86,19 @@ func TestIntegrationAlertDedup(t *testing.T) {
 
 	env, err := outbox.NewEnvelope("recon.alert", "recon.alerts", "01a14f70-0000-7000-8000-000000000001", nil, []byte("payload-1"))
 	require.NoError(t, err)
-	dedupKey := "status_mismatch|ref|expected|actual"
+	alert := domain.Alert{
+		Type: domain.AlertStatusMismatch, RefID: "ref", Severity: domain.AlertSeverityWarning,
+		Expected: "expected", Actual: "actual",
+	}
+	dedupKey := alert.DedupKey()
 
-	inserted, err := store.RaiseAlert(ctx, dedupKey, env)
+	inserted, err := store.RaiseAlert(ctx, alert, env)
 	require.NoError(t, err)
 	require.True(t, inserted)
 
 	second, err := outbox.NewEnvelope("recon.alert", "recon.alerts", "01a14f70-0000-7000-8000-000000000001", nil, []byte("payload-2"))
 	require.NoError(t, err)
-	inserted, err = store.RaiseAlert(ctx, dedupKey, second)
+	inserted, err = store.RaiseAlert(ctx, alert, second)
 	require.NoError(t, err)
 	require.False(t, inserted, "the second detection is a counter bump, not a publication")
 

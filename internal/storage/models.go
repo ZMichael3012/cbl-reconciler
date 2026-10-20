@@ -52,6 +52,12 @@ func (PayoutObservationRow) TableName() string { return "recon_payout_observatio
 type AlertKeyRow struct {
 	DedupKey    string    `gorm:"column:dedup_key;primaryKey"`
 	AlertID     string    `gorm:"column:alert_id;type:uuid;not null"`
+	AlertType   string    `gorm:"column:alert_type;not null;default:''"`
+	RefID       string    `gorm:"column:ref_id;not null;default:''"`
+	MerchantID  string    `gorm:"column:merchant_id;not null;default:''"`
+	Severity    string    `gorm:"column:severity;not null;default:''"`
+	Expected    string    `gorm:"column:expected;not null;default:''"`
+	Actual      string    `gorm:"column:actual;not null;default:''"`
 	FirstSeenAt time.Time `gorm:"column:first_seen_at;not null"`
 	LastSeenAt  time.Time `gorm:"column:last_seen_at;not null"`
 	Occurrences int       `gorm:"column:occurrences;not null;default:1"`
